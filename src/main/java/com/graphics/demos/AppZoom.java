@@ -1,4 +1,4 @@
-package com.graphics;
+package com.graphics.demos;
 
 import java.nio.FloatBuffer;
 

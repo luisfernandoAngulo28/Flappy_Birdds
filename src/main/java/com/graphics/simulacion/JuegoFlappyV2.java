@@ -1,4 +1,7 @@
-package com.graphics;
+package com.graphics.simulacion;
+
+import com.graphics.flappybird.Bird;
+import com.graphics.flappybird.Tuberia;
 
 import java.util.ArrayList;
 import java.util.Random;

@@ -1,4 +1,4 @@
-package com.graphics;
+package com.graphics.demos;
 
 import java.nio.FloatBuffer;
 
@@ -10,29 +10,28 @@ import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
 
-public class AppMovimientoTeclado {
+public class AppMovimientoZoom {
 
     private long window;
     private int programa;
     private int vao;
     private int vbo;
 
-    // uOffsetLocation almacena la ubicación (ID interno) del uniform "uOffset" dentro del shader.
-    // Este valor es obtenido desde el programa compilado en la GPU mediante glGetUniformLocation.
-    // Se utiliza posteriormente para enviar datos (offsetX, offsetY) desde la CPU al shader con glUniform2f,
-    // permitiendo desplazar el triángulo de forma uniforme en cada frame sin modificar los vértices originales.
     private int uOffsetLocation;
+    private int uZoomLocation;
 
     private static final int ANCHO = 800;
     private static final int ALTO = 600;
 
-    // Offset del triángulo; se manda al shader en cada frame para moverlo.
     private float offsetX = 0.0f;
     private float offsetY = 0.0f;
-    // Velocidad en unidades OpenGL por segundo (combinada con deltaTime).
-    private static final float VELOCIDAD = 1.2f;
-    // Límite del desplazamiento para mantener el triángulo en zona visible.
-    private static final float LIMITE = 0.9f;
+    private static final float VELOCIDAD_MOV = 1.2f;
+    private static final float LIMITE_MOV = 0.9f;
+
+    private float zoom = 1.0f;
+    private static final float ZOOM_MIN = 0.25f;
+    private static final float ZOOM_MAX = 3.00f;
+    private static final float VELOCIDAD_ZOOM = 1.25f;
 
     public void run() {
         init();
@@ -53,21 +52,27 @@ public class AppMovimientoTeclado {
         GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_CORE_PROFILE);
         GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GLFW.GLFW_TRUE);
 
-        window = GLFW.glfwCreateWindow(ANCHO, ALTO, "OpenGL - Triangulo Movible", 0, 0);
+        window = GLFW.glfwCreateWindow(ANCHO, ALTO, "OpenGL - Movimiento + Zoom", 0, 0);
         if (window == 0) {
             throw new RuntimeException("No se pudo crear la ventana");
         }
 
-        // Atajo nuevo: cerrar ventana al presionar ESC.
         GLFW.glfwSetKeyCallback(window, (w, key, scancode, action, mods) -> {
             if (key == GLFW.GLFW_KEY_ESCAPE && action == GLFW.GLFW_PRESS) {
                 GLFW.glfwSetWindowShouldClose(w, true);
             }
         });
 
+        // Zoom adicional con rueda del mouse.
+        GLFW.glfwSetScrollCallback(window, (w, xoffset, yoffset) -> {
+            zoom += (float) yoffset * 0.10f;
+            zoom = clamp(zoom, ZOOM_MIN, ZOOM_MAX);
+        });
+
         GLFW.glfwMakeContextCurrent(window);
         GLFW.glfwSwapInterval(1);
         GLFW.glfwShowWindow(window);
+
         GL.createCapabilities();
 
         crearShaders();
@@ -75,16 +80,13 @@ public class AppMovimientoTeclado {
     }
 
     private void crearShaders() {
-        // Vertex shader:
-        // - Recibe posición original "aPos" del VBO.
-        // - Recibe "uOffset" (uniform) para desplazar el triángulo completo.
-        // - Construye posición final sumando offset a XY.
         String vertexSrc = """
             #version 330 core
             layout (location = 0) in vec3 aPos;
             uniform vec2 uOffset;
+            uniform float uZoom;
             void main() {
-                vec3 pos = vec3(aPos.xy + uOffset, aPos.z);
+                vec3 pos = vec3((aPos.xy * uZoom) + uOffset, aPos.z);
                 gl_Position = vec4(pos, 1.0);
             }
             """;
@@ -114,11 +116,10 @@ public class AppMovimientoTeclado {
             throw new RuntimeException("Error al enlazar programa: " + GL20.glGetProgramInfoLog(programa));
         }
 
-        // Buscamos la dirección del uniform "uOffset".
-        // Esta dirección se usa cada frame con glUniform2f para actualizar la posición.
         uOffsetLocation = GL20.glGetUniformLocation(programa, "uOffset");
-        if (uOffsetLocation == -1) {
-            throw new RuntimeException("No se encontro el uniform uOffset");
+        uZoomLocation = GL20.glGetUniformLocation(programa, "uZoom");
+        if (uOffsetLocation == -1 || uZoomLocation == -1) {
+            throw new RuntimeException("No se encontraron uniforms requeridos (uOffset/uZoom)");
         }
 
         GL20.glDeleteShader(vertexShader);
@@ -156,57 +157,64 @@ public class AppMovimientoTeclado {
     }
 
     private void procesarInput(float deltaTime) {
-        // Distancia recorrida este frame:
-        // velocidad (unidades/s) * tiempo del frame (s) = unidades/frame.
-        float paso = VELOCIDAD * deltaTime;
+        float pasoMov = VELOCIDAD_MOV * deltaTime;
+        float pasoZoom = VELOCIDAD_ZOOM * deltaTime;
 
-        // Movimiento horizontal: izquierda con flecha izquierda o tecla A.
+        // Movimiento: WASD y flechas.
         if (GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT) == GLFW.GLFW_PRESS
                 || GLFW.glfwGetKey(window, GLFW.GLFW_KEY_A) == GLFW.GLFW_PRESS) {
-            offsetX -= paso;
+            offsetX -= pasoMov;
         }
-        // Movimiento horizontal: derecha con flecha derecha o tecla D.
         if (GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT) == GLFW.GLFW_PRESS
                 || GLFW.glfwGetKey(window, GLFW.GLFW_KEY_D) == GLFW.GLFW_PRESS) {
-            offsetX += paso;
+            offsetX += pasoMov;
         }
-        // Movimiento vertical: arriba con flecha arriba o tecla W.
         if (GLFW.glfwGetKey(window, GLFW.GLFW_KEY_UP) == GLFW.GLFW_PRESS
                 || GLFW.glfwGetKey(window, GLFW.GLFW_KEY_W) == GLFW.GLFW_PRESS) {
-            offsetY += paso;
+            offsetY += pasoMov;
         }
-        // Movimiento vertical: abajo con flecha abajo o tecla S.
         if (GLFW.glfwGetKey(window, GLFW.GLFW_KEY_DOWN) == GLFW.GLFW_PRESS
                 || GLFW.glfwGetKey(window, GLFW.GLFW_KEY_S) == GLFW.GLFW_PRESS) {
-            offsetY -= paso;
+            offsetY -= pasoMov;
         }
 
-        // Clamping de seguridad para mantener el triángulo dentro de una zona visible.
-        // Evita acumulación infinita de offset si una tecla se mantiene mucho tiempo.
-        offsetX = Math.max(-LIMITE, Math.min(LIMITE, offsetX));
-        offsetY = Math.max(-LIMITE, Math.min(LIMITE, offsetY));
+        // Zoom por teclado.
+        if (GLFW.glfwGetKey(window, GLFW.GLFW_KEY_KP_ADD) == GLFW.GLFW_PRESS
+                || GLFW.glfwGetKey(window, GLFW.GLFW_KEY_EQUAL) == GLFW.GLFW_PRESS
+                || GLFW.glfwGetKey(window, GLFW.GLFW_KEY_E) == GLFW.GLFW_PRESS) {
+            zoom += pasoZoom;
+        }
+        if (GLFW.glfwGetKey(window, GLFW.GLFW_KEY_KP_SUBTRACT) == GLFW.GLFW_PRESS
+                || GLFW.glfwGetKey(window, GLFW.GLFW_KEY_MINUS) == GLFW.GLFW_PRESS
+                || GLFW.glfwGetKey(window, GLFW.GLFW_KEY_Q) == GLFW.GLFW_PRESS) {
+            zoom -= pasoZoom;
+        }
+
+        offsetX = clamp(offsetX, -LIMITE_MOV, LIMITE_MOV);
+        offsetY = clamp(offsetY, -LIMITE_MOV, LIMITE_MOV);
+        zoom = clamp(zoom, ZOOM_MIN, ZOOM_MAX);
+    }
+
+    private float clamp(float value, float min, float max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private void loop() {
-        // Nuevo: referencia de tiempo para calcular deltaTime entre frames.
         float ultimoTiempo = (float) GLFW.glfwGetTime();
 
         while (!GLFW.glfwWindowShouldClose(window)) {
-            // Nuevo: movimiento desacoplado de FPS usando deltaTime.
             float tiempoActual = (float) GLFW.glfwGetTime();
             float deltaTime = tiempoActual - ultimoTiempo;
             ultimoTiempo = tiempoActual;
 
-            // Actualiza offsetX/offsetY según teclado.
             procesarInput(deltaTime);
 
             GL11.glClearColor(0.08f, 0.08f, 0.12f, 1.0f);
             GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
 
             GL20.glUseProgram(programa);
-            // Enviamos el offset actualizado al shader antes de dibujar.
-            // A partir de este valor, el vertex shader desplaza cada vértice.
             GL20.glUniform2f(uOffsetLocation, offsetX, offsetY);
+            GL20.glUniform1f(uZoomLocation, zoom);
             GL30.glBindVertexArray(vao);
             GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 3);
 
@@ -224,6 +232,6 @@ public class AppMovimientoTeclado {
     }
 
     public static void main(String[] args) {
-        new AppMovimientoTeclado().run();
+        new AppMovimientoZoom().run();
     }
 }

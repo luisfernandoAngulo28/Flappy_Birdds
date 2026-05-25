@@ -1,23 +1,23 @@
-package com.graphics;
+package com.graphics.flappybird;
 
 /**
  * Estado completo de un jugador: posicion, velocidad, puntaje,
  * color, teclas de salto y temporizadores de animacion.
  */
-class Bird {
+public class Bird {
 
-    static final float FLASH_DURACION = 0.5f; // segundos que dura el parpadeo al morir
+    public static final float FLASH_DURACION = 0.5f; // segundos que dura el parpadeo al morir
 
-    float y, velocidadY;
-    int score;
-    boolean alive, saltoPrevio;
-    float anguloAla, tiempoFlash;
+    public float y, velocidadY;
+    public int score, puntajeAnterior;
+    public boolean alive, saltoPrevio;
+    public float anguloAla, tiempoFlash;
 
-    final int[] jumpKeys;
-    final float cr, cg, cb;
-    final String nombre;
+    public final int[] jumpKeys;
+    public final float cr, cg, cb;
+    public final String nombre;
 
-    Bird(float startY, float cr, float cg, float cb, String nombre, int... jumpKeys) {
+    public Bird(float startY, float cr, float cg, float cb, String nombre, int... jumpKeys) {
         this.cr = cr;
         this.cg = cg;
         this.cb = cb;
@@ -26,10 +26,11 @@ class Bird {
         reset(startY); //deja el pájaro listo para jugar
     }
 
-    void reset(float startY) {
+    public void reset(float startY) {
         y = startY;
         velocidadY = 0f;
         score = 0;
+        puntajeAnterior = 0;
         alive = true;
         saltoPrevio = false;
         anguloAla = 0f;
@@ -46,7 +47,7 @@ class Bird {
      */
 
     // Marca al pajaro como eliminado y activa el flash de muerte.
-    void matar() {
+    public void matar() {
         alive = false;
         tiempoFlash = FLASH_DURACION;
     }

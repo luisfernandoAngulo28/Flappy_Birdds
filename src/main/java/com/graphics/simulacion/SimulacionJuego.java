@@ -1,4 +1,7 @@
-package com.graphics;
+package com.graphics.simulacion;
+
+import com.graphics.flappybird.Bird;
+import com.graphics.flappybird.Tuberia;
 
 public class SimulacionJuego {
 

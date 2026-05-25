@@ -1,4 +1,4 @@
-package com.graphics;
+package com.graphics.demos;
 
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.opengl.GL;
